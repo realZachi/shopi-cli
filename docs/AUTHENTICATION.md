@@ -43,6 +43,27 @@ A successful run prints your shop name, plan, and granted scopes. The token
 the command again. Shopify validates scopes on every request, so a read scope can
 only run reads and mutations require matching write scopes.
 
+## Save a profile (alternative to `.env`)
+
+Instead of environment variables, you can store the same credentials in a named
+profile. `shopi` keeps refreshing the token for you on every run:
+
+```sh
+shopi auth login \
+  --shop your-store.myshopify.com \
+  --client-id your-client-id \
+  --client-secret your-client-secret \
+  --profile production \
+  --validate
+```
+
+If you already have an Admin API access token, pass `--token shpat_…` instead of
+the client ID/secret. Profiles live in `~/.config/shopi/config.json` (or
+`$XDG_CONFIG_HOME/shopi/config.json`, or the path in `SHOPI_CONFIG`), created with
+`0600` permissions. They hold your credentials — never commit them. Use `--local`
+to scope a profile to a single repo (`./.shopi/config.json`), select one with
+`--profile <name>`, and remove one with `shopi auth logout --profile <name>`.
+
 ## Health checks
 
 ```sh

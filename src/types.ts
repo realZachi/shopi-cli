@@ -6,7 +6,12 @@ export type OutputFormat = "json" | "table" | "markdown";
 export interface Profile {
   name: string;
   shop: string;
-  token: string;
+  /** Admin API access token, for access-token profiles. */
+  token?: string;
+  /** Dev Dashboard client ID, for client-credentials profiles. */
+  clientId?: string;
+  /** Dev Dashboard client secret, for client-credentials profiles. */
+  clientSecret?: string;
   apiVersion: string;
   createdAt: string;
   updatedAt: string;
@@ -19,6 +24,8 @@ export interface ConfigFile {
 }
 
 export interface ResolvedProfile extends Profile {
+  /** Always populated after resolution (exchanged from client credentials when needed). */
+  token: string;
   source: "env" | "local" | "global" | "custom";
   configPath?: string;
   authMethod?: "access-token" | "client-credentials";

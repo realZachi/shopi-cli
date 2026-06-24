@@ -101,6 +101,27 @@ shopi auth status --validate
 A successful run prints your shop name, plan, and granted scopes. There's a
 ready-made [`.env.example`](.env.example) to copy from.
 
+**Prefer a saved login over a `.env` file?** Store the same credentials in a
+named profile with `shopi auth login`:
+
+```sh
+shopi auth login \
+  --shop your-store.myshopify.com \
+  --client-id your-client-id \
+  --client-secret your-client-secret \
+  --profile production \
+  --validate
+```
+
+`shopi` still refreshes the token automatically on every run. (If you already
+have an Admin API access token, pass `--token shpat_…` instead of
+`--client-id`/`--client-secret`.)
+
+Profiles are written to `~/.config/shopi/config.json` (`0600` permissions — it
+holds your credentials, so don't commit it). Select one later with
+`--profile production`, or scope it to a single repo with `--local`
+(`./.shopi/config.json`).
+
 ---
 
 ## Choose your scopes

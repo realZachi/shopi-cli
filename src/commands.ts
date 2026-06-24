@@ -1,6 +1,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { parseArgv, getBooleanFlag, getFlag, getRepeatedFlag } from "./args";
+import { requestClientCredentialsToken } from "./auth";
 import { ShopifyAdminClient, SHOP_STATUS_QUERY } from "./client";
 import {
   deleteProfile,
@@ -107,17 +108,72 @@ async function handleAuth(
     case "login": {
       const profileName = getFlag(flags, "profile") ?? "default";
       const shop = getFlag(flags, "shop") ?? context.env.SHOPIFY_SHOP;
+      if (!shop) {
+        throw new ShopiError("Missing --shop.");
+      }
+      const apiVersion =
+        getFlag(flags, "api-version") ??
+        context.env.SHOPIFY_API_VERSION ??
+        DEFAULT_API_VERSION;
+      const clientId = getFlag(flags, "client-id") ?? context.env.SHOPIFY_CLIENT_ID;
+      const clientSecret =
+        getFlag(flags, "client-secret") ?? context.env.SHOPIFY_CLIENT_SECRET;
+
+      // Client-credentials login (Dev Dashboard app): store the app credentials and
+      // let shopi mint a fresh access token on every run.
+      if (clientId && clientSecret) {
+        const validated: Record<string, unknown> = {};
+        if (getBooleanFlag(flags, "validate")) {
+          // Exchange up front so we never persist credentials that don't work.
+          const exchanged = await requestClientCredentialsToken({ shop, clientId, clientSecret });
+          const client = clientForProfile(
+            context,
+            { shop: normalizeShop(shop), token: exchanged.accessToken, apiVersion },
+            flags
+          );
+          validated.shopInfo = (await client.request(SHOP_STATUS_QUERY)).data;
+          if (exchanged.scope) {
+            validated.tokenScopes = exchanged.scope;
+          }
+        }
+        const saved = await upsertProfile({
+          cwd: context.cwd,
+          env: context.env,
+          local: getBooleanFlag(flags, "local"),
+          profile: profileName,
+          shop,
+          clientId,
+          clientSecret,
+          apiVersion,
+          makeDefault: true
+        });
+        writeOutput(
+          {
+            profile: saved.profile.name,
+            shop: saved.profile.shop,
+            apiVersion: saved.profile.apiVersion,
+            authMethod: "client-credentials",
+            clientId: redactToken(clientId),
+            config: saved.configPath,
+            source: saved.source,
+            ...validated
+          },
+          outputOptions(context, flags)
+        );
+        return;
+      }
+
+      // Access-token login.
       const rawToken =
         getFlag(flags, "token") ??
         (getFlag(flags, "token-file")
           ? `@${getFlag(flags, "token-file")}`
           : context.env.SHOPIFY_ACCESS_TOKEN);
-      if (!shop) {
-        throw new ShopiError("Missing --shop.");
-      }
       const token = (await readTextInput(rawToken, context))?.trim();
       if (!token) {
-        throw new ShopiError("Missing --token or SHOPIFY_ACCESS_TOKEN.");
+        throw new ShopiError(
+          "Missing credentials. Pass --client-id and --client-secret, or --token / SHOPIFY_ACCESS_TOKEN."
+        );
       }
       const saved = await upsertProfile({
         cwd: context.cwd,
@@ -126,26 +182,24 @@ async function handleAuth(
         profile: profileName,
         shop,
         token,
-        apiVersion:
-          getFlag(flags, "api-version") ??
-          context.env.SHOPIFY_API_VERSION ??
-          DEFAULT_API_VERSION,
+        apiVersion,
         makeDefault: true
       });
       const result: Record<string, unknown> = {
         profile: saved.profile.name,
         shop: saved.profile.shop,
         apiVersion: saved.profile.apiVersion,
-        token: redactToken(saved.profile.token),
+        authMethod: "access-token",
+        token: redactToken(token),
         config: saved.configPath,
         source: saved.source
       };
       if (getBooleanFlag(flags, "validate")) {
-        const client = new ShopifyAdminClient({
-          profile: saved.profile,
-          debug: getBooleanFlag(flags, "api-debug"),
-          stderr: context.stderr
-        });
+        const client = clientForProfile(
+          context,
+          { shop: saved.profile.shop, token, apiVersion: saved.profile.apiVersion },
+          flags
+        );
         result.shopInfo = (await client.request(SHOP_STATUS_QUERY)).data;
       }
       writeOutput(result, outputOptions(context, flags));
@@ -196,7 +250,12 @@ async function handleAuth(
         default: listed.config.defaultProfile === profile.name,
         shop: profile.shop,
         apiVersion: profile.apiVersion,
-        token: redactToken(profile.token),
+        authMethod: profile.clientId ? "client-credentials" : "access-token",
+        credential: profile.clientId
+          ? redactToken(profile.clientId)
+          : profile.token
+            ? redactToken(profile.token)
+            : "—",
         updatedAt: profile.updatedAt
       }));
       writeOutput(
@@ -529,7 +588,7 @@ async function resolveProfileFromFlags(
 
 function clientForProfile(
   context: CommandContext,
-  profile: Pick<Profile, "shop" | "token" | "apiVersion">,
+  profile: { shop: string; token: string; apiVersion: string },
   flags: Record<string, FlagValue>
 ): ShopifyAdminClient {
   return new ShopifyAdminClient({
@@ -650,7 +709,9 @@ function publicProfile(profile: ResolvedProfile | (Profile & { source?: string }
     name: profile.name,
     shop: normalizeShop(profile.shop),
     apiVersion: profile.apiVersion,
-    token: redactToken(profile.token),
+    token: profile.token ? redactToken(profile.token) : undefined,
+    clientId:
+      "clientId" in profile && profile.clientId ? redactToken(profile.clientId) : undefined,
     source: "source" in profile ? profile.source : undefined,
     config: "configPath" in profile ? profile.configPath : undefined,
     authMethod: "authMethod" in profile ? profile.authMethod : undefined,
@@ -683,14 +744,20 @@ function printHelp(context: CommandContext, topic?: string): void {
   const helpByTopic: Record<string, string> = {
     auth: `shopi auth
 
-Environment auth:
-  export SHOPIFY_SHOP=your-store.myshopify.com
-  export SHOPIFY_CLIENT_ID=...
-  export SHOPIFY_CLIENT_SECRET=...
+Log in with Dev Dashboard client credentials (recommended):
+  shopi auth login --shop <shop> --client-id <id> --client-secret <secret> [--validate]
+
+...or with an Admin API access token:
+  shopi auth login --shop <shop> --token <shpat_...> [--validate]
+
+Or skip the profile and use a .env / environment variables:
+  SHOPIFY_SHOP=your-store.myshopify.com
+  SHOPIFY_CLIENT_ID=...
+  SHOPIFY_CLIENT_SECRET=...
   shopi auth status --validate
 
 Commands:
-  shopi auth login --shop <shop> --token <token> [--profile default] [--local] [--validate]
+  shopi auth login [--shop <shop>] [--client-id <id> --client-secret <secret> | --token <token>] [--profile default] [--local] [--validate]
   shopi auth status [--validate]
   shopi auth profiles
   shopi auth doctor
@@ -733,10 +800,9 @@ Examples:
 JSON-first Shopify Admin GraphQL CLI for humans, agents, and CI.
 
 Usage:
-  export SHOPIFY_SHOP=your-store.myshopify.com
-  export SHOPIFY_CLIENT_ID=...
-  export SHOPIFY_CLIENT_SECRET=...
-  shopi auth login --shop <shop> --token <token> [--validate]
+  shopi auth login --shop <shop> --client-id <id> --client-secret <secret> [--validate]
+  # or use a .env / environment variables:
+  #   SHOPIFY_SHOP, SHOPIFY_CLIENT_ID, SHOPIFY_CLIENT_SECRET
   shopi gql --query '{ shop { name } }'
   shopi read <QueryRoot-field> [--arg name=value] [--select '<selection>']
   shopi write <Mutation-field> --input @input.json --confirm

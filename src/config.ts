@@ -103,11 +103,20 @@ export async function upsertProfile(
   options: ConfigLocationOptions & {
     profile: string;
     shop: string;
-    token: string;
+    token?: string;
+    clientId?: string;
+    clientSecret?: string;
     apiVersion?: string;
     makeDefault?: boolean;
   }
 ): Promise<{ configPath: string; profile: Profile; source: "local" | "global" | "custom" }> {
+  const hasToken = Boolean(options.token?.trim());
+  const hasCredentials = Boolean(options.clientId?.trim() && options.clientSecret?.trim());
+  if (!hasToken && !hasCredentials) {
+    throw new ShopiError(
+      "A profile needs either an access token or a client ID and client secret."
+    );
+  }
   const resolved = await resolveConfigPath(options);
   const config = await loadConfig(resolved.path);
   const now = new Date().toISOString();
@@ -115,10 +124,13 @@ export async function upsertProfile(
   const profile: Profile = {
     name: options.profile,
     shop: normalizeShop(options.shop),
-    token: options.token.trim(),
     apiVersion: options.apiVersion ?? existing?.apiVersion ?? DEFAULT_API_VERSION,
     createdAt: existing?.createdAt ?? now,
-    updatedAt: now
+    updatedAt: now,
+    // Store exactly one credential kind; never carry a stale token alongside credentials.
+    ...(hasCredentials
+      ? { clientId: options.clientId!.trim(), clientSecret: options.clientSecret!.trim() }
+      : { token: options.token!.trim() })
   };
   config.profiles[options.profile] = profile;
   if (options.makeDefault ?? !config.defaultProfile) {
@@ -213,9 +225,35 @@ export async function resolveProfile(
   if (!profile) {
     throw new ShopiError(`Profile not found: ${name}`);
   }
+  const apiVersion = options.apiVersion ?? profile.apiVersion;
+
+  if (profile.clientId && profile.clientSecret) {
+    const token = await requestClientCredentialsToken({
+      shop: profile.shop,
+      clientId: profile.clientId,
+      clientSecret: profile.clientSecret
+    });
+    return {
+      ...profile,
+      token: token.accessToken,
+      apiVersion,
+      source: resolved.source,
+      configPath: resolved.path,
+      authMethod: "client-credentials",
+      ...(token.expiresIn !== undefined ? { tokenExpiresIn: token.expiresIn } : {}),
+      ...(token.scope ? { tokenScopes: token.scope } : {})
+    };
+  }
+
+  if (!profile.token) {
+    throw new ShopiError(
+      `Profile "${name}" has no credentials. Re-run \`shopi auth login\`.`
+    );
+  }
   return {
     ...profile,
-    apiVersion: options.apiVersion ?? profile.apiVersion,
+    token: profile.token,
+    apiVersion,
     source: resolved.source,
     configPath: resolved.path,
     authMethod: "access-token"

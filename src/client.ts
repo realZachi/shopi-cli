@@ -1,8 +1,8 @@
 import { ShopiError } from "./errors";
-import type { GraphQLResponse, Profile } from "./types";
+import type { GraphQLResponse } from "./types";
 
 export interface ShopifyClientOptions {
-  profile: Pick<Profile, "shop" | "token" | "apiVersion">;
+  profile: { shop: string; token: string; apiVersion: string };
   debug?: boolean;
   fetchImpl?: typeof fetch;
   stderr?: NodeJS.WriteStream;

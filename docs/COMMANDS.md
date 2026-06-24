@@ -16,17 +16,24 @@
 
 ## auth
 
-Preferred environment auth for Dev Dashboard apps:
+Environment auth for Dev Dashboard apps (or use a `.env` file with the same keys):
 
 ```sh
 export SHOPIFY_SHOP=your-store.myshopify.com
-export SHOPIFY_CLIENT_ID=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-export SHOPIFY_CLIENT_SECRET=shpss_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+export SHOPIFY_CLIENT_ID=your-client-id
+export SHOPIFY_CLIENT_SECRET=your-client-secret
 shopi auth status --validate
 ```
 
+Or save the credentials in a named profile:
+
 ```sh
-shopi auth login --shop <shop> --token <token> [--profile default] [--local] [--validate]
+# Dev Dashboard client credentials (recommended):
+shopi auth login --shop <shop> --client-id <id> --client-secret <secret> [--profile default] [--local] [--validate]
+
+# ...or an Admin API access token:
+shopi auth login --shop <shop> --token <shpat_...> [--profile default] [--local] [--validate]
+
 shopi auth status [--validate]
 shopi auth profiles
 shopi auth doctor
