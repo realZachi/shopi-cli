@@ -5,9 +5,10 @@
   "license": "MIT",
   "type": "module",
   "bin": {
-    "shopi": "./src/cli.ts"
+    "shopi": "bin/shopi"
   },
   "files": [
+    "bin",
     "src",
     "docs",
     "examples",

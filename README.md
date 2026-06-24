@@ -1,139 +1,183 @@
-# shopi-cli
+# shopi
 
-`shopi` is a JSON-first Shopify Admin GraphQL CLI for store owners, operators,
-developers, agents, and CI jobs. It is intentionally thin over Shopify Admin
-GraphQL: exact GraphQL documents are supported, and every live QueryRoot and
-MutationRoot field can be discovered and addressed through schema introspection.
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Runtime: Bun](https://img.shields.io/badge/runtime-Bun-000000?logo=bun&logoColor=white)](https://bun.sh)
 
-This project is open source under the MIT license and is not affiliated with,
-endorsed by, or sponsored by Shopify Inc. Shopify is a trademark of Shopify Inc.
+**A JSON-first command-line interface for the Shopify Admin GraphQL API** — for
+store owners, operators, developers, AI agents, and CI jobs.
+
+`shopi` is intentionally a thin layer over Shopify Admin GraphQL. It does not
+hide the API behind hand-written wrappers. Instead it reads the *live* schema of
+your store and lets you call **any** query or mutation Shopify exposes:
+
+```sh
+shopi read products --first 10 --select 'nodes { id title status }'
+shopi write productCreate --input @product.json --confirm
+shopi gql --query '{ shop { name plan { publicDisplayName } } }'
+```
+
+> This project is open source under the MIT license. It is **not** affiliated
+> with, endorsed by, or sponsored by Shopify Inc. "Shopify" is a trademark of
+> Shopify Inc.
+
+---
+
+## Contents
+
+- [What it does](#what-it-does)
+- [Getting started](#getting-started) ← install + connect in 3 steps
+- [Choose your scopes](#choose-your-scopes)
+- [First commands](#first-commands)
+- [Common workflows](#common-workflows)
+- [Output formats](#output-formats)
+- [Troubleshooting](#troubleshooting)
+- [Command reference](#command-reference)
+- [Development](#development)
+- [License](#license)
+
+---
 
 ## What it does
 
-- Stores local or global Shopify Admin API profiles.
-- Runs exact Admin GraphQL documents with variables from JSON files or stdin.
-- Lists and inspects all live Admin GraphQL query and mutation entry points.
-- Builds read commands from QueryRoot fields, for example `products` or `orders`.
-- Builds write commands from MutationRoot fields, for example `productCreate` or
-  `metafieldsSet`.
-- Uses TTY-aware output: tables in terminals, JSON in scripts and pipes.
-- Supports `json`, `table`, and `markdown` output explicitly.
-- Keeps write operations guarded with `--confirm`.
+- Runs **exact** Admin GraphQL documents, with variables from files, flags, or stdin.
+- Builds read commands from any `QueryRoot` field (`products`, `orders`, `shop`, …).
+- Builds write commands from any `MutationRoot` field (`productCreate`, `metafieldsSet`, …).
+- Discovers and inspects every live query/mutation through schema introspection.
+- Picks sensible output automatically: **tables** in a terminal, **JSON** in pipes and CI.
+- Guards every write behind an explicit `--confirm` flag.
 
-`shopi` cannot bypass Shopify access scopes. Your app must be installed with
-the read or write scopes required by the operation you run.
+`shopi` can never bypass Shopify access scopes. Each operation only works if your
+app was installed with the matching `read_*` / `write_*` scope.
 
-## Install
+---
+
+## Getting started
+
+### 1. Install
+
+`shopi` runs on [Bun](https://bun.sh) (≥ 1.1).
 
 ```sh
 bun add -g shopi-cli
+
+shopi version   # → shopi-cli 0.1.0
 ```
 
-For local development from this repository:
+### 2. Create a Shopify app
+
+`shopi` connects with a **Client ID** and **Client secret** from a Dev Dashboard
+app that is installed on your store.
+
+1. Open **<https://admin.shopify.com/settings/apps/development>** in your store
+   admin and click through to the **Dev Dashboard**.
+2. **Create an app** and give it a name (only you see it).
+3. Add the **Admin API access scopes** your work needs — e.g. `read_products`,
+   `write_products`, `read_orders`. See [Choose your scopes](#choose-your-scopes).
+4. **Install the app on your store** and copy the **Client ID** and
+   **Client secret** from the app's **Settings**.
+
+> Keep the Client secret like a password — never commit it.
+
+### 3. Connect `shopi`
+
+Create a `.env` file in your working directory with your shop and credentials
+(`shopi` reads `.env` automatically; you can also `export` the variables
+instead):
 
 ```sh
-bun install
-bun run shopi --help
+SHOPIFY_SHOP=your-store.myshopify.com
+SHOPIFY_CLIENT_ID=your-client-id
+SHOPIFY_CLIENT_SECRET=your-client-secret
 ```
 
-You can also run the binary directly:
+That's it — you're connected. `shopi` exchanges your credentials for a
+short-lived Admin API token on every run (refreshed automatically), so nothing
+sensitive is written to disk. Verify it:
 
 ```sh
-./src/cli.ts --help
+shopi auth status --validate
 ```
 
-## Authentication
+A successful run prints your shop name, plan, and granted scopes. There's a
+ready-made [`.env.example`](.env.example) to copy from.
 
-For Dev Dashboard apps installed on your own store, put the shop, client ID,
-and client secret in your environment. `shopi` exchanges those credentials for
-a short-lived Admin API access token when it runs.
+---
 
-```sh
-export SHOPIFY_SHOP=your-store.myshopify.com
-export SHOPIFY_CLIENT_ID=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-export SHOPIFY_CLIENT_SECRET=shpss_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-export SHOPIFY_API_VERSION=2026-04
+## Choose your scopes
 
-shopi auth status --validate --output json
-```
-
-You can find the client credentials in the Shopify Dev Dashboard:
+Grant the **narrowest** set of scopes that covers your workflow. A read scope can
+only run reads; mutations need the matching `write_*` scope. Typical starting
+points:
 
 ```text
-Dev Dashboard -> Apps -> your app -> Settings -> Client ID / Client secret
+read_products,write_products,read_orders,read_customers,read_inventory,write_inventory
 ```
 
-`SHOPIFY_ACCESS_TOKEN=shpat_...` is still supported as an explicit fallback,
-but client credentials are the preferred env-based flow.
-
-You can also save a profile with an already-issued Admin API access token:
-
-```sh
-shopi auth login \
-  --shop your-store.myshopify.com \
-  --token shpat_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx \
-  --profile production \
-  --validate
-```
-
-Use a local repo-scoped profile when you do not want global machine config:
-
-```sh
-shopi auth login --local --shop your-store --token shpat_xxx
-```
-
-## Scopes
-
-Use the narrowest scope set that covers your workflow. For broad shop
-operations with this CLI, this scope string worked against the test shop:
+<details>
+<summary>Broad "manage most of the shop" scope string used against the test store</summary>
 
 ```text
 read_assigned_fulfillment_orders,write_assigned_fulfillment_orders,read_customers,write_customers,read_price_rules,write_price_rules,read_discounts,write_discounts,write_draft_orders,read_draft_orders,read_files,write_files,read_fulfillments,write_fulfillments,write_inventory,read_inventory,read_legal_policies,read_locales,write_locales,write_locations,read_locations,write_marketing_events,read_marketing_events,read_markets,write_markets,read_merchant_managed_fulfillment_orders,write_merchant_managed_fulfillment_orders,read_metaobject_definitions,write_metaobject_definitions,read_metaobjects,write_metaobjects,read_online_store_pages,write_order_edits,read_order_edits,read_orders,write_orders,read_products,write_products,read_reports,read_returns,write_returns,read_shipping,write_shipping,read_content,write_content,read_themes,write_themes,read_third_party_fulfillment_orders,write_third_party_fulfillment_orders,read_translations,write_translations
 ```
 
-Some Shopify scopes require approval, a specific app type, Shopify Plus, or a
-specific extension flow. Do not add scopes Shopify rejects during app release;
-add them only when your app is eligible for them.
+</details>
+
+Some scopes require app review, a specific app type, or Shopify Plus. Only add
+scopes your app is eligible for — Shopify rejects the rest. After changing
+scopes, reinstall/update the app on the store.
+
+---
 
 ## First commands
 
 ```sh
 shopi version
-shopi auth status --validate
+shopi auth status --validate                 # confirm the connection
 shopi gql --query '{ shop { name myshopifyDomain } }'
-shopi schema pull
-shopi ops list --kind query --filter product
-shopi ops show productCreate --kind mutation --output json --pretty
+shopi schema pull                            # cache the live Admin schema
+shopi ops list --kind query --filter product # discover available operations
+shopi ops show productCreate --kind mutation --json --pretty
 ```
 
-## Read from any QueryRoot field
+Built-in help is always the source of truth:
 
-`shopi read` loads the live Admin schema, validates the root field and
-arguments, then builds a GraphQL query.
+```sh
+shopi --help
+shopi help read
+shopi help write
+```
+
+---
+
+## Common workflows
+
+### Read from any `QueryRoot` field
+
+`shopi read` loads the live schema, validates the field and its arguments, then
+builds the query for you.
 
 ```sh
 shopi read products --first 10 --select 'nodes { id title handle status }'
-shopi read orders --first 25 --query 'financial_status:paid' --output json
-shopi read product --id gid://shopify/Product/1234567890 --json --pretty
+shopi read orders   --first 25 --query 'financial_status:paid' --output json
+shopi read product  --id gid://shopify/Product/1234567890 --json --pretty
 ```
 
-Preview the generated operation without calling Shopify:
+Preview the generated GraphQL **without** calling Shopify:
 
 ```sh
 shopi read products --first 5 --dry-run --json --pretty
 ```
 
-## Write to any MutationRoot field
+### Write to any `MutationRoot` field
 
-`shopi write` uses the same live schema but targets MutationRoot. It refuses to
-execute unless you pass `--confirm`.
+`shopi write` targets `MutationRoot`. It refuses to run unless you pass
+`--confirm`.
 
 ```sh
 shopi write productCreate \
   --input @examples/product-create.json \
   --select 'product { id title handle } userErrors { field message }' \
-  --confirm \
-  --json --pretty
+  --confirm --json --pretty
 ```
 
 For mutations with multiple arguments, pass them explicitly:
@@ -145,22 +189,42 @@ shopi write metafieldsSet \
   --confirm
 ```
 
-## Run exact GraphQL
+**Safety pattern:** dry-run first, then confirm the exact same command.
+
+```sh
+shopi write productCreate --input @product.json --dry-run --json --pretty
+shopi write productCreate --input @product.json --confirm --json --pretty
+```
+
+### Run exact GraphQL
 
 ```sh
 shopi gql --file examples/shop-info.graphql --json --pretty
 shopi gql --file examples/products-list.graphql --variables '{"first": 10}'
-shopi gql --file examples/product-create.graphql --variables '{"product":{"title":"Example"}}' --confirm
-shopi gql --file mutation.graphql --variables @variables.json --full
+shopi gql --file mutation.graphql --variables @variables.json --confirm
 ```
 
-`--full` includes GraphQL extensions such as cost data. Without it, `shopi`
-prints only `data`.
+`--full` includes GraphQL `extensions` (such as query-cost data). Without it,
+`shopi` prints only `data`.
 
-## Output
+### Discover the schema
 
-Interactive terminals default to `table`. Pipes and CI default to `json`.
-Override with:
+```sh
+shopi ops list --kind mutation --filter metafield   # find operations
+shopi ops show orders --kind query --json --pretty  # inspect args & return type
+shopi schema show Product --json --pretty           # inspect a type
+shopi schema path                                   # where the cache lives
+```
+
+The schema is cached under `$XDG_CACHE_HOME/shopi` (or `~/.cache/shopi`). Add
+`--refresh` to any read/write/ops command to re-pull it.
+
+---
+
+## Output formats
+
+Interactive terminals default to `table`; pipes and CI default to `json`.
+Override explicitly:
 
 ```sh
 shopi read products --first 10 --output json --pretty
@@ -168,17 +232,35 @@ shopi read products --first 10 --output markdown
 shopi read products --first 10 --table
 ```
 
+---
+
+## Troubleshooting
+
+**`shop_not_permitted` / "Client credentials cannot be performed on this shop".**
+The app and the store are not in the **same** Dev Dashboard organization. Open
+the Dev Dashboard, confirm the store appears under **Stores** in the *same* org
+as the app, and that `SHOPIFY_SHOP` matches its `*.myshopify.com` domain exactly.
+A store created from the Shopify admin (rather than the Dev Dashboard) is usually
+the cause — recreate the dev store from the Dev Dashboard's **Stores** page.
+
+**`401 Unauthorized` / "Invalid API key or access token".** Re-check your
+`SHOPIFY_CLIENT_ID` / `SHOPIFY_CLIENT_SECRET` and that the app is installed on the
+store. `shopi auth doctor --api-debug` prints HTTP status/timing to stderr (never
+the token).
+
+**A write is refused.** Mutations require `--confirm`. Run with `--dry-run` first
+to preview the generated GraphQL, then re-run with `--confirm`.
+
+**`Access denied` for a field.** Your app is missing the required scope. Add the
+matching `read_*` / `write_*` scope in the Dev Dashboard, **reinstall/update** the
+app on the store, then try again.
+
+**See more detail.** `SHOPI_DEBUG=1 shopi …` prints extra error detail;
+`--api-debug` prints request diagnostics.
+
+---
+
 ## Command reference
-
-Use built-in help as the source of truth:
-
-```sh
-shopi --help
-shopi help auth
-shopi help gql
-shopi help read
-shopi help write
-```
 
 Repo documentation:
 
@@ -188,17 +270,29 @@ Repo documentation:
 - [Contributing](CONTRIBUTING.md)
 - [Security](SECURITY.md)
 
+You can also read these from the CLI itself:
+
+```sh
+shopi docs show auth
+shopi docs show commands
+shopi docs show use-cases
+```
+
+---
+
 ## Development
 
 ```sh
 bun install
-bun run check
-bun run build
+bun run check     # typecheck + tests
+bun run build     # bundle to dist/shopi
 ```
 
-The project has no runtime dependencies. Development uses Bun, TypeScript, and
+The CLI has **no runtime dependencies**. Development uses Bun, TypeScript, and
 `bun test`.
+
+---
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+MIT — see [LICENSE](LICENSE).

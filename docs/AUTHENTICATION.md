@@ -1,74 +1,47 @@
 # Authentication
 
-`shopi` uses Shopify Admin API access tokens. For Dev Dashboard apps installed
-on your own store, it can exchange `SHOPIFY_CLIENT_ID` and
-`SHOPIFY_CLIENT_SECRET` for an Admin API access token at runtime.
+`shopi` connects to the Shopify Admin API with a **Client ID** and **Client
+secret** from a Dev Dashboard app that is installed on your store. It exchanges
+them for a short-lived Admin API token on every run (via the OAuth
+[client credentials grant](https://shopify.dev/docs/apps/build/authentication-authorization/access-tokens/client-credentials-grant)),
+so no long-lived token is ever stored on disk.
 
-## Dev Dashboard client credentials
+## 1. Create and install an app
 
-1. Open the Shopify Dev Dashboard.
-2. Select your app.
-3. Go to Settings.
-4. Copy the Client ID and Client secret.
-5. Make sure the app is installed on the target store.
+1. Open **<https://admin.shopify.com/settings/apps/development>** in your store
+   admin and click through to the **Dev Dashboard**.
+2. **Create an app** and name it (visible only to you).
+3. Configure the **Admin API access scopes** your workflow needs, then save/release.
+4. **Install the app on your store.**
+   - The app and the store must be in the **same** Dev Dashboard organization. If
+     the store isn't listed under **Stores**, create a development store from the
+     Dev Dashboard's **Stores** page and install into that one. (A store created
+     from the Shopify admin is not in your org and will fail with
+     `shop_not_permitted`.)
+5. Open the app's **Settings** and copy the **Client ID** and **Client secret**.
+
+## 2. Provide your credentials
+
+Create a `.env` file in your working directory (`shopi` loads it automatically),
+or `export` the variables in your shell:
 
 ```sh
-export SHOPIFY_SHOP=your-store.myshopify.com
-export SHOPIFY_CLIENT_ID=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-export SHOPIFY_CLIENT_SECRET=shpss_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-export SHOPIFY_API_VERSION=2026-04
+SHOPIFY_SHOP=your-store.myshopify.com
+SHOPIFY_CLIENT_ID=your-client-id
+SHOPIFY_CLIENT_SECRET=your-client-secret
+SHOPIFY_API_VERSION=2026-04        # optional, defaults to 2026-04
+```
+
+Then verify the connection:
+
+```sh
 shopi auth status --validate
 ```
 
-Shopify validates scopes on every request. A read scope can run read operations
-only. Write mutations require matching write scopes. Client-credentials access
-tokens expire, so `shopi` requests a fresh token when it starts.
-
-`SHOPIFY_ACCESS_TOKEN=shpat_...` remains supported as an explicit fallback.
-
-## Global profile
-
-```sh
-shopi auth login \
-  --shop your-store.myshopify.com \
-  --token shpat_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx \
-  --profile production \
-  --validate
-```
-
-Global config is written to:
-
-```text
-~/.config/shopi/config.json
-```
-
-or `$XDG_CONFIG_HOME/shopi/config.json` when `XDG_CONFIG_HOME` is set.
-
-## Local profile
-
-```sh
-shopi auth login --local --shop your-store --token shpat_xxx
-```
-
-Local config is written to:
-
-```text
-./.shopi/config.json
-```
-
-Do not commit this file.
-
-## Environment-only auth
-
-```sh
-export SHOPIFY_SHOP=your-store.myshopify.com
-export SHOPIFY_CLIENT_ID=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-export SHOPIFY_CLIENT_SECRET=shpss_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-export SHOPIFY_API_VERSION=2026-04
-shopi auth status --validate
-```
-
-Environment variables take precedence when no explicit `--profile` is passed.
+A successful run prints your shop name, plan, and granted scopes. The token
+`shopi` obtains expires after 24 hours and is refreshed automatically — just run
+the command again. Shopify validates scopes on every request, so a read scope can
+only run reads and mutations require matching write scopes.
 
 ## Health checks
 
@@ -79,3 +52,12 @@ shopi auth doctor --api-debug
 
 `--api-debug` prints request status and timing to stderr. It never prints the
 access token.
+
+## Troubleshooting
+
+- **`shop_not_permitted`** — the app and store aren't in the same Dev Dashboard
+  organization. Recreate the dev store from the Dev Dashboard and reinstall.
+- **`401` / "Invalid API key or access token"** — re-check `SHOPIFY_CLIENT_ID` /
+  `SHOPIFY_CLIENT_SECRET` and that the app is installed on the store.
+- **`Access denied` on a field** — missing scope. Add it in the Dev Dashboard,
+  reinstall/update the app, then retry.
