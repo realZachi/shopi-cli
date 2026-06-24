@@ -20,8 +20,8 @@ endorsed by, or sponsored by Shopify Inc. Shopify is a trademark of Shopify Inc.
 - Supports `json`, `table`, and `markdown` output explicitly.
 - Keeps write operations guarded with `--confirm`.
 
-`shopi` cannot bypass Shopify access scopes. Your Admin API access token must
-have the read or write scopes required by the operation you run.
+`shopi` cannot bypass Shopify access scopes. Your app must be installed with
+the read or write scopes required by the operation you run.
 
 ## Install
 
@@ -44,8 +44,29 @@ You can also run the binary directly:
 
 ## Authentication
 
-Create a custom app in your Shopify admin, enable Admin API scopes, install the
-app, and copy the Admin API access token. Then save a profile:
+For Dev Dashboard apps installed on your own store, put the shop, client ID,
+and client secret in your environment. `shopi` exchanges those credentials for
+a short-lived Admin API access token when it runs.
+
+```sh
+export SHOPIFY_SHOP=your-store.myshopify.com
+export SHOPIFY_CLIENT_ID=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+export SHOPIFY_CLIENT_SECRET=shpss_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+export SHOPIFY_API_VERSION=2026-04
+
+shopi auth status --validate --output json
+```
+
+You can find the client credentials in the Shopify Dev Dashboard:
+
+```text
+Dev Dashboard -> Apps -> your app -> Settings -> Client ID / Client secret
+```
+
+`SHOPIFY_ACCESS_TOKEN=shpat_...` is still supported as an explicit fallback,
+but client credentials are the preferred env-based flow.
+
+You can also save a profile with an already-issued Admin API access token:
 
 ```sh
 shopi auth login \
@@ -61,14 +82,18 @@ Use a local repo-scoped profile when you do not want global machine config:
 shopi auth login --local --shop your-store --token shpat_xxx
 ```
 
-For CI and agents, environment variables work without writing config:
+## Scopes
 
-```sh
-export SHOPIFY_SHOP=your-store.myshopify.com
-export SHOPIFY_ACCESS_TOKEN=shpat_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-export SHOPIFY_API_VERSION=2026-04
-shopi auth status --validate --output json
+Use the narrowest scope set that covers your workflow. For broad shop
+operations with this CLI, this scope string worked against the test shop:
+
+```text
+read_assigned_fulfillment_orders,write_assigned_fulfillment_orders,read_customers,write_customers,read_price_rules,write_price_rules,read_discounts,write_discounts,write_draft_orders,read_draft_orders,read_files,write_files,read_fulfillments,write_fulfillments,write_inventory,read_inventory,read_legal_policies,read_locales,write_locales,write_locations,read_locations,write_marketing_events,read_marketing_events,read_markets,write_markets,read_merchant_managed_fulfillment_orders,write_merchant_managed_fulfillment_orders,read_metaobject_definitions,write_metaobject_definitions,read_metaobjects,write_metaobjects,read_online_store_pages,write_order_edits,read_order_edits,read_orders,write_orders,read_products,write_products,read_reports,read_returns,write_returns,read_shipping,write_shipping,read_content,write_content,read_themes,write_themes,read_third_party_fulfillment_orders,write_third_party_fulfillment_orders,read_translations,write_translations
 ```
+
+Some Shopify scopes require approval, a specific app type, Shopify Plus, or a
+specific extension flow. Do not add scopes Shopify rejects during app release;
+add them only when your app is eligible for them.
 
 ## First commands
 

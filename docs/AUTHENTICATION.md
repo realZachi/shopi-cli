@@ -1,18 +1,30 @@
 # Authentication
 
-`shopi` uses Shopify Admin API access tokens. It does not run OAuth itself and
-does not create Shopify apps for you.
+`shopi` uses Shopify Admin API access tokens. For Dev Dashboard apps installed
+on your own store, it can exchange `SHOPIFY_CLIENT_ID` and
+`SHOPIFY_CLIENT_SECRET` for an Admin API access token at runtime.
 
-## Create a token
+## Dev Dashboard client credentials
 
-1. Open the Shopify admin for your store.
-2. Go to app development and create a custom app.
-3. Enable only the Admin API scopes needed for your workflows.
-4. Install the custom app.
-5. Copy the Admin API access token.
+1. Open the Shopify Dev Dashboard.
+2. Select your app.
+3. Go to Settings.
+4. Copy the Client ID and Client secret.
+5. Make sure the app is installed on the target store.
 
-Shopify validates scopes on every request. A read token can run read operations
-only. Write mutations require matching write scopes.
+```sh
+export SHOPIFY_SHOP=your-store.myshopify.com
+export SHOPIFY_CLIENT_ID=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+export SHOPIFY_CLIENT_SECRET=shpss_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+export SHOPIFY_API_VERSION=2026-04
+shopi auth status --validate
+```
+
+Shopify validates scopes on every request. A read scope can run read operations
+only. Write mutations require matching write scopes. Client-credentials access
+tokens expire, so `shopi` requests a fresh token when it starts.
+
+`SHOPIFY_ACCESS_TOKEN=shpat_...` remains supported as an explicit fallback.
 
 ## Global profile
 
@@ -50,7 +62,8 @@ Do not commit this file.
 
 ```sh
 export SHOPIFY_SHOP=your-store.myshopify.com
-export SHOPIFY_ACCESS_TOKEN=shpat_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+export SHOPIFY_CLIENT_ID=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+export SHOPIFY_CLIENT_SECRET=shpss_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 export SHOPIFY_API_VERSION=2026-04
 shopi auth status --validate
 ```

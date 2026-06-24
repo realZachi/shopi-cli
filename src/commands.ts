@@ -652,7 +652,10 @@ function publicProfile(profile: ResolvedProfile | (Profile & { source?: string }
     apiVersion: profile.apiVersion,
     token: redactToken(profile.token),
     source: "source" in profile ? profile.source : undefined,
-    config: "configPath" in profile ? profile.configPath : undefined
+    config: "configPath" in profile ? profile.configPath : undefined,
+    authMethod: "authMethod" in profile ? profile.authMethod : undefined,
+    tokenExpiresIn: "tokenExpiresIn" in profile ? profile.tokenExpiresIn : undefined,
+    tokenScopes: "tokenScopes" in profile ? profile.tokenScopes : undefined
   };
 }
 
@@ -679,6 +682,12 @@ function looksLikeMutation(query: string): boolean {
 function printHelp(context: CommandContext, topic?: string): void {
   const helpByTopic: Record<string, string> = {
     auth: `shopi auth
+
+Environment auth:
+  export SHOPIFY_SHOP=your-store.myshopify.com
+  export SHOPIFY_CLIENT_ID=...
+  export SHOPIFY_CLIENT_SECRET=...
+  shopi auth status --validate
 
 Commands:
   shopi auth login --shop <shop> --token <token> [--profile default] [--local] [--validate]
@@ -724,6 +733,9 @@ Examples:
 JSON-first Shopify Admin GraphQL CLI for humans, agents, and CI.
 
 Usage:
+  export SHOPIFY_SHOP=your-store.myshopify.com
+  export SHOPIFY_CLIENT_ID=...
+  export SHOPIFY_CLIENT_SECRET=...
   shopi auth login --shop <shop> --token <token> [--validate]
   shopi gql --query '{ shop { name } }'
   shopi read <QueryRoot-field> [--arg name=value] [--select '<selection>']

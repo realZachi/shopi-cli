@@ -21,6 +21,9 @@ export interface ConfigFile {
 export interface ResolvedProfile extends Profile {
   source: "env" | "local" | "global" | "custom";
   configPath?: string;
+  authMethod?: "access-token" | "client-credentials";
+  tokenExpiresIn?: number;
+  tokenScopes?: string;
 }
 
 export interface CommandContext {

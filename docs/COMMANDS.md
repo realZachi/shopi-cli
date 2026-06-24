@@ -16,6 +16,15 @@
 
 ## auth
 
+Preferred environment auth for Dev Dashboard apps:
+
+```sh
+export SHOPIFY_SHOP=your-store.myshopify.com
+export SHOPIFY_CLIENT_ID=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+export SHOPIFY_CLIENT_SECRET=shpss_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+shopi auth status --validate
+```
+
 ```sh
 shopi auth login --shop <shop> --token <token> [--profile default] [--local] [--validate]
 shopi auth status [--validate]

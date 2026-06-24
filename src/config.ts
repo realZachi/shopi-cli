@@ -1,6 +1,7 @@
 import { chmod, mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { homedir } from "node:os";
+import { requestClientCredentialsToken } from "./auth";
 import { ShopiError } from "./errors";
 import { DEFAULT_API_VERSION, type ConfigFile, type Profile, type ResolvedProfile } from "./types";
 
@@ -162,6 +163,29 @@ export async function resolveProfile(
 ): Promise<ResolvedProfile> {
   const envShop = options.env.SHOPIFY_SHOP;
   const envToken = options.env.SHOPIFY_ACCESS_TOKEN;
+  const envClientId = options.env.SHOPIFY_CLIENT_ID;
+  const envClientSecret = options.env.SHOPIFY_CLIENT_SECRET;
+  if (!options.profile && envShop && envClientId && envClientSecret) {
+    const now = new Date().toISOString();
+    const token = await requestClientCredentialsToken({
+      shop: envShop,
+      clientId: envClientId,
+      clientSecret: envClientSecret
+    });
+    return {
+      name: "env",
+      shop: normalizeShop(envShop),
+      token: token.accessToken,
+      apiVersion:
+        options.apiVersion ?? options.env.SHOPIFY_API_VERSION ?? DEFAULT_API_VERSION,
+      createdAt: now,
+      updatedAt: now,
+      source: "env",
+      authMethod: "client-credentials",
+      ...(token.expiresIn !== undefined ? { tokenExpiresIn: token.expiresIn } : {}),
+      ...(token.scope ? { tokenScopes: token.scope } : {})
+    };
+  }
   if (!options.profile && envShop && envToken) {
     const now = new Date().toISOString();
     return {
@@ -172,7 +196,8 @@ export async function resolveProfile(
         options.apiVersion ?? options.env.SHOPIFY_API_VERSION ?? DEFAULT_API_VERSION,
       createdAt: now,
       updatedAt: now,
-      source: "env"
+      source: "env",
+      authMethod: "access-token"
     };
   }
 
@@ -181,7 +206,7 @@ export async function resolveProfile(
   const name = options.profile ?? config.defaultProfile ?? Object.keys(config.profiles)[0];
   if (!name) {
     throw new ShopiError(
-      "No Shopify profile configured. Run `shopi auth login --shop <shop> --token <token>` or set SHOPIFY_SHOP and SHOPIFY_ACCESS_TOKEN."
+      "No Shopify profile configured. Set SHOPIFY_SHOP, SHOPIFY_CLIENT_ID, and SHOPIFY_CLIENT_SECRET, or run `shopi auth login --shop <shop> --token <token>`."
     );
   }
   const profile = config.profiles[name];
@@ -192,7 +217,8 @@ export async function resolveProfile(
     ...profile,
     apiVersion: options.apiVersion ?? profile.apiVersion,
     source: resolved.source,
-    configPath: resolved.path
+    configPath: resolved.path,
+    authMethod: "access-token"
   };
 }
 
