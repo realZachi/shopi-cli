@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/og-image.png" alt="shopi-cli — CLI for the Shopify Admin API. Built for humans and agents (Codex, Claude, Gemini, Factory AI, Grok, and more)." width="100%">
+</p>
+
 # shopi
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
