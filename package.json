@@ -1,0 +1,41 @@
+{
+  "name": "shopi-cli",
+  "version": "0.1.0",
+  "description": "JSON-first Shopify Admin GraphQL CLI for humans, agents, and CI.",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "shopi": "./src/cli.ts"
+  },
+  "files": [
+    "src",
+    "docs",
+    "examples",
+    "LICENSE",
+    "README.md",
+    "SECURITY.md",
+    "CONTRIBUTING.md"
+  ],
+  "scripts": {
+    "shopi": "bun ./src/cli.ts",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit",
+    "check": "bun run typecheck && bun test",
+    "build": "bun build ./src/cli.ts --target=bun --outfile=dist/shopi"
+  },
+  "keywords": [
+    "shopify",
+    "shopify-admin",
+    "graphql",
+    "cli",
+    "automation",
+    "agent"
+  ],
+  "engines": {
+    "bun": ">=1.1.0"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.2.18",
+    "typescript": "^5.8.3"
+  }
+}
