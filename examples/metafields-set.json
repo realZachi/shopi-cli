@@ -1,0 +1,9 @@
+[
+  {
+    "ownerId": "gid://shopify/Product/1234567890",
+    "namespace": "custom",
+    "key": "source",
+    "type": "single_line_text_field",
+    "value": "shopi-cli"
+  }
+]

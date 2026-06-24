@@ -1,0 +1,12 @@
+query ShopiShopInfo {
+  shop {
+    name
+    myshopifyDomain
+    primaryDomain {
+      host
+    }
+    plan {
+      publicDisplayName
+    }
+  }
+}

@@ -1,0 +1,15 @@
+query ShopiProductsList($first: Int = 10, $query: String) {
+  products(first: $first, query: $query) {
+    nodes {
+      id
+      title
+      handle
+      status
+      updatedAt
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+  }
+}
