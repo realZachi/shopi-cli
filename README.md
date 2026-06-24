@@ -292,6 +292,7 @@ Repo documentation:
 - [Authentication](docs/AUTHENTICATION.md)
 - [Commands](docs/COMMANDS.md)
 - [Use cases](docs/USE_CASES.md)
+- [Agent Skills](skills/README.md)
 - [Contributing](CONTRIBUTING.md)
 - [Security](SECURITY.md)
 
@@ -302,6 +303,40 @@ shopi docs show auth
 shopi docs show commands
 shopi docs show use-cases
 ```
+
+---
+
+## Agent Skills
+
+`shopi` ships a pack of [Agent Skills](skills/README.md) that teach coding agents
+— Claude Code, the Claude Agent SDK, and Claude.ai — how to drive the CLI across
+the whole Shopify Admin API: discovery, reading, writing, and end-to-end domain
+workflows. A **hub** skill (`shopi-cli-usage`) covers the CLI mechanics, and
+focused **domain** skills layer the exact Admin GraphQL fields, inputs, and
+gotchas on top of it.
+
+| Skill | For |
+| --- | --- |
+| `shopi-cli-usage` | **(hub)** running, designing, and debugging any `shopi` command |
+| `shopi-auth-and-profiles` | credentials, scopes, profiles, CI auth |
+| `shopi-products-and-collections` | products, variants, media, collections |
+| `shopi-orders-and-fulfillment` | orders, fulfillment, returns, refunds |
+| `shopi-customers` | customers, segments, B2B companies |
+| `shopi-inventory-and-locations` | stock levels, locations, cost & tracking |
+| `shopi-metafields-and-metaobjects` | custom data (metafields & metaobjects) |
+| `shopi-discounts-and-pricing` | discounts, redeem codes, price lists |
+| `shopi-bulk-operations` | large exports/imports via bulk operations |
+
+Install the whole pack so it's available in any project:
+
+```sh
+mkdir -p ~/.claude/skills
+cp -R skills/shopi-* ~/.claude/skills/
+```
+
+The skills trigger automatically when a request matches — you don't need to name
+them. See [skills/README.md](skills/README.md) for per-skill descriptions,
+project-scoped installation, and the design principles they follow.
 
 ---
 
